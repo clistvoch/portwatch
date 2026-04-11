@@ -36,3 +36,8 @@ func (m *MultiHandler) Handle(c Change) {
 func (m *MultiHandler) Add(h Handler) {
 	m.handlers = append(m.handlers, h)
 }
+
+// Len returns the number of handlers registered in the MultiHandler.
+func (m *MultiHandler) Len() int {
+	return len(m.handlers)
+}
