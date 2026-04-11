@@ -24,3 +24,10 @@ func validatePagerDuty(cfg PagerDutyConfig) error {
 	}
 	return nil
 }
+
+// IsReady reports whether the PagerDuty integration is enabled and fully
+// configured. It can be used by alert handlers to guard against sending
+// events when the integration is not set up.
+func (p PagerDutyConfig) IsReady() bool {
+	return p.Enabled && p.RoutingKey != ""
+}
