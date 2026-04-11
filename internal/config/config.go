@@ -1,62 +1,66 @@
 package config
 
 import (
-	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
-	"time"
+
+	"github.com/BurntSushi/toml"
 )
 
-// Config holds the portwatch daemon configuration.
+// Config holds the full portwatch configuration.
 type Config struct {
-	StartPort  int           `json:"start_port"`
-	EndPort    int           `json:"end_port"`
-	Interval   time.Duration `json:"interval"`
-	LogFile    string        `json:"log_file"`
-	LogPrefix  string        `json:"log_prefix"`
+	PortRange string `toml:"port_range"`
+	Interval  int    `toml:"interval_seconds"`
+	StateFile string `toml:"state_file"`
+	LogFile   string `toml:"log_file"`
+	Webhook   string `toml:"webhook_url"`
+	Email     Email  `toml:"email"`
 }
 
-// DefaultConfig returns a Config populated with sensible defaults.
-func DefaultConfig() *Config {
-	return &Config{
-		StartPort: 1,
-		EndPort:   1024,
-		Interval:  30 * time.Second,
-		LogFile:   "",
-		LogPrefix: "[portwatch]",
+// Email holds SMTP alert settings.
+type Email struct {
+	Enabled  bool     `toml:"enabled"`
+	Host     string   `toml:"host"`
+	Port     int      `toml:"port"`
+	Username string   `toml:"username"`
+	Password string   `toml:"password"`
+	From     string   `toml:"from"`
+	To       []string `toml:"to"`
+}
+
+// DefaultConfig returns a Config with sensible defaults.
+func DefaultConfig() Config {
+	return Config{
+		PortRange: "1-1024",
+		Interval:  60,
+		StateFile: "/tmp/portwatch.state",
 	}
 }
 
-// Load reads a JSON config file from path and merges it over defaults.
-func Load(path string) (*Config, error) {
+// Load reads a TOML config file into a Config struct.
+func Load(path string) (Config, error) {
 	cfg := DefaultConfig()
-
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return cfg, fmt.Errorf("config file not found: %s", path)
 	}
-	defer f.Close()
-
-	if err := json.NewDecoder(f).Decode(cfg); err != nil {
-		return nil, err
+	if _, err := toml.DecodeFile(path, &cfg); err != nil {
+		return cfg, fmt.Errorf("parse config: %w", err)
 	}
-
-	return cfg, cfg.Validate()
+	return cfg, Validate(cfg)
 }
 
-// Validate checks that the Config fields are within acceptable bounds.
-func (c *Config) Validate() error {
-	if c.StartPort < 1 || c.StartPort > 65535 {
-		return errors.New("config: start_port must be between 1 and 65535")
+// Validate checks Config fields for correctness.
+func Validate(cfg Config) error {
+	if cfg.Interval <= 0 {
+		return fmt.Errorf("interval_seconds must be > 0")
 	}
-	if c.EndPort < 1 || c.EndPort > 65535 {
-		return errors.New("config: end_port must be between 1 and 65535")
+	var lo, hi int
+	if _, err := fmt.Sscanf(cfg.PortRange, "%d-%d", &lo, &hi); err != nil {
+		return fmt.Errorf("invalid port_range %q", cfg.PortRange)
 	}
-	if c.StartPort > c.EndPort {
-		return errors.New("config: start_port must not be greater than end_port")
-	}
-	if c.Interval < time.Second {
-		return errors.New("config: interval must be at least 1s")
+	if lo < 1 || hi > 65535 || lo > hi {
+		return fmt.Errorf("port_range out of bounds: %s", cfg.PortRange)
 	}
 	return nil
 }
