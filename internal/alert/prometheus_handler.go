@@ -75,6 +75,11 @@ func (h *PrometheusHandler) Handle(changes []monitor.Change) error {
 	return nil
 }
 
+// Total returns the cumulative number of port changes recorded by this handler.
+func (h *PrometheusHandler) Total() int64 {
+	return h.total.Load()
+}
+
 // Close shuts down the metrics HTTP server.
 func (h *PrometheusHandler) Close() error {
 	return h.server.Shutdown(context.Background())
