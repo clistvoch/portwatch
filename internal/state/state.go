@@ -2,6 +2,7 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
@@ -28,10 +29,13 @@ func NewStore(path string) *Store {
 func (s *Store) Save(snap Snapshot) error {
 	f, err := os.Create(s.path)
 	if err != nil {
-		return err
+		return fmt.Errorf("state: creating snapshot file %q: %w", s.path, err)
 	}
 	defer f.Close()
-	return json.NewEncoder(f).Encode(snap)
+	if err := json.NewEncoder(f).Encode(snap); err != nil {
+		return fmt.Errorf("state: encoding snapshot: %w", err)
+	}
+	return nil
 }
 
 // Load reads the most recent snapshot from disk.
@@ -42,13 +46,13 @@ func (s *Store) Load() (Snapshot, error) {
 		return Snapshot{}, nil
 	}
 	if err != nil {
-		return Snapshot{}, err
+		return Snapshot{}, fmt.Errorf("state: opening snapshot file %q: %w", s.path, err)
 	}
 	defer f.Close()
 
 	var snap Snapshot
 	if err := json.NewDecoder(f).Decode(&snap); err != nil {
-		return Snapshot{}, err
+		return Snapshot{}, fmt.Errorf("state: decoding snapshot: %w", err)
 	}
 	return snap, nil
 }
