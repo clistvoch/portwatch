@@ -66,3 +66,13 @@ func (p *Printer) PrintChangesOnly(changes []monitor.Change) {
 		fmt.Fprintf(p.out, "%s\n", c)
 	}
 }
+
+// PrintSummary writes a one-line summary of the snapshot, including the
+// number of open ports and detected changes. Useful for compact log output.
+func (p *Printer) PrintSummary(s Snapshot) {
+	fmt.Fprintf(p.out, "[%s] open ports: %d, changes: %d\n",
+		s.Timestamp.Format(time.RFC3339),
+		len(s.OpenPorts),
+		len(s.Changes),
+	)
+}
