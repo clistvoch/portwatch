@@ -77,3 +77,13 @@ func TestWebhookHandler_ServerError(t *testing.T) {
 		t.Error("expected error on 500 response, got nil")
 	}
 }
+
+func TestWebhookHandler_InvalidURL(t *testing.T) {
+	// Ensure Handle returns an error when the webhook URL is unreachable.
+	h := alert.NewWebhookHandler("http://127.0.0.1:0/invalid")
+	changes := []monitor.Change{{Port: 443, Kind: monitor.Opened}}
+
+	if err := h.Handle(changes); err == nil {
+		t.Error("expected error for unreachable URL, got nil")
+	}
+}
