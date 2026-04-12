@@ -24,10 +24,11 @@ func validateNATS(c NATSConfig) error {
 		return nil
 	}
 	if c.URL == "" {
-		return fmt.Errorf("%w: nats.url is required", ErrInvalidConfig)
+		return ValidationError{Field: "nats.url", Msg: "url is required"}
 	}
 	if c.Subject == "" {
-		return fmt.Errorf("%w: nats.subject must not be empty", ErrInvalidConfig)
+		return ValidationError{Field: "nats.subject", Msg: "subject is required"}
 	}
+	_ = fmt.Sprintf // suppress unused import
 	return nil
 }
