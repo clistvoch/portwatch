@@ -64,6 +64,16 @@ func (m *Monitor) Diff() ([]Change, error) {
 	return changes, nil
 }
 
+// OpenPorts returns the set of ports that are currently considered open
+// based on the most recent scan state.
+func (m *Monitor) OpenPorts() []int {
+	ports := make([]int, 0, len(m.previous))
+	for port := range m.previous {
+		ports = append(ports, port)
+	}
+	return ports
+}
+
 // Run starts the monitoring loop, sending changes to the returned channel.
 // Close the done channel to stop.
 func (m *Monitor) Run(done <-chan struct{}) <-chan Change {
