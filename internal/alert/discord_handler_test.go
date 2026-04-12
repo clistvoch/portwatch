@@ -1,4 +1,4 @@
-package alert
+package alert_test
 
 import (
 	"encoding/json"
@@ -6,14 +6,18 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/user/portwatch/internal/alert"
 	"github.com/user/portwatch/internal/monitor"
-	"github.com/user/portwatch/internal/scanner"
 )
 
-func buildDiscordChange(port int, state monitor.ChangeType) monitor.Change {
+func buildDiscordChange(port int, kind monitor.ChangeKind) monitor.Change {
 	return monitor.Change{
-		Type: state,
-		Port: scanner.PortInfo{Port: port, Proto: "tcp"},
+		Port: port,
+		Kind: kind,
+		Proto: "tcp",
 	}
 }
 
@@ -24,44 +28,34 @@ func TestDiscordHandler_NoChanges(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	h := NewDiscordHandler(ts.URL, "portwatch", "")
-	if err := h.Handle(nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if called {
-		t.Error("expected no HTTP call for empty changes")
-	}
+	h := alert.NewDiscordHandler(ts.URL, "portwatch")
+	err := h.Handle([]monitor.Change{})
+	require.NoError(t, err)
+	assert.False(t, called, "should not POST when there are no changes")
 }
 
 func TestDiscordHandler_SendsPayload(t *testing.T) {
-	var received discordPayload
+	var received map[string]interface{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
-			t.Errorf("decode body: %v", err)
-		}
+		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&received))
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer ts.Close()
 
-	h := NewDiscordHandler(ts.URL, "bot", "http://example.com/avatar.png")
+	h := alert.NewDiscordHandler(ts.URL, "portwatch")
 	changes := []monitor.Change{
 		buildDiscordChange(8080, monitor.Opened),
 		buildDiscordChange(9090, monitor.Closed),
 	}
+	err := h.Handle(changes)
+	require.NoError(t, err)
 
-	if err := h.Handle(changes); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if received.Username != "bot" {
-		t.Errorf("expected username 'bot', got %q", received.Username)
-	}
-	if len(received.Embeds) != 1 {
-		t.Fatalf("expected 1 embed, got %d", len(received.Embeds))
-	}
-	if received.Embeds[0].Color != 0xFF4444 {
-		t.Errorf("expected color 0xFF4444, got %d", received.Embeds[0].Color)
-	}
+	assert.Equal(t, "portwatch", received["username"])
+	content, ok := received["content"].(string)
+	require.True(t, ok)
+	assert.Contains(t, content, "8080")
+	assert.Contains(t, content, "9090")
 }
 
 func TestDiscordHandler_ServerError(t *testing.T) {
@@ -70,10 +64,8 @@ func TestDiscordHandler_ServerError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	h := NewDiscordHandler(ts.URL, "portwatch", "")
-	changes := []monitor.Change{buildDiscordChange(443, monitor.Opened)}
-
-	if err := h.Handle(changes); err == nil {
-		t.Error("expected error on server 500, got nil")
-	}
+	h := alert.NewDiscordHandler(ts.URL, "portwatch")
+	err := h.Handle([]monitor.Change{buildDiscordChange(443, monitor.Opened)})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "500")
 }
