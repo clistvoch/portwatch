@@ -72,3 +72,12 @@ func TestPagerDutyHandler_ServerError(t *testing.T) {
 		t.Fatal("expected error for 500 response, got nil")
 	}
 }
+
+func TestPagerDutyHandler_EmptySlice(t *testing.T) {
+	// Ensure that an explicitly empty (non-nil) slice is also treated as a no-op
+	// and does not attempt a network request.
+	h := NewPagerDutyHandler("test-key")
+	if err := h.Handle([]monitor.Change{}); err != nil {
+		t.Fatalf("expected no error for empty changes slice, got %v", err)
+	}
+}
