@@ -66,3 +66,21 @@ path = "noslash"
 		t.Error("expected validation error for path without leading slash")
 	}
 }
+
+// TestLoad_PrometheusEmptyAddress verifies that Validate rejects an empty
+// prometheus address when prometheus is enabled.
+func TestLoad_PrometheusEmptyAddress(t *testing.T) {
+	p := writePrometheusConfig(t, `
+[prometheus]
+enabled = true
+address = ""
+path = "/metrics"
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if err := Validate(*cfg); err == nil {
+		t.Error("expected validation error for empty prometheus address")
+	}
+}
