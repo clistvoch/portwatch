@@ -2,21 +2,18 @@ package config
 
 import "fmt"
 
+// LokiConfig holds configuration for the Loki alert handler.
 type LokiConfig struct {
-	Enabled  bool   `toml:"enabled"`
-	URL      string `toml:"url"`
-	TenantID string `toml:"tenant_id"`
-	Labels   map[string]string `toml:"labels"`
-	Timeout  int    `toml:"timeout_seconds"`
+	Enabled bool              `toml:"enabled"`
+	URL     string            `toml:"url"`
+	Labels  map[string]string `toml:"labels"`
 }
 
 func defaultLokiConfig() LokiConfig {
 	return LokiConfig{
-		Enabled:  false,
-		URL:      "",
-		TenantID: "",
-		Labels:   map[string]string{"app": "portwatch"},
-		Timeout:  5,
+		Enabled: false,
+		URL:     "",
+		Labels:  map[string]string{"job": "portwatch"},
 	}
 }
 
@@ -25,10 +22,7 @@ func validateLoki(c LokiConfig) error {
 		return nil
 	}
 	if c.URL == "" {
-		return &ValidationError{Field: "loki.url", Message: "url is required when loki is enabled"}
-	}
-	if c.Timeout <= 0 {
-		return fmt.Errorf("loki.timeout_seconds must be greater than 0")
+		return fmt.Errorf("loki: url is required when enabled")
 	}
 	return nil
 }

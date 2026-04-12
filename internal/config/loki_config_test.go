@@ -1,10 +1,8 @@
-package config_test
+package config
 
 import (
 	"os"
 	"testing"
-
-	"github.com/user/portwatch/internal/config"
 )
 
 func writeLokiConfig(t *testing.T, content string) string {
@@ -21,51 +19,61 @@ func writeLokiConfig(t *testing.T, content string) string {
 }
 
 func TestLoad_LokiDefaults(t *testing.T) {
-	cfg := config.DefaultConfig()
+	path := writeLokiConfig(t, "[scanner]\nport_range = \"1-1024\"\n")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if cfg.Loki.Enabled {
-		t.Error("expected loki to be disabled by default")
+		t.Error("expected loki disabled by default")
 	}
-	if cfg.Loki.Timeout != 5 {
-		t.Errorf("expected default timeout 5, got %d", cfg.Loki.Timeout)
+	if cfg.Loki.URL != "" {
+		t.Errorf("expected empty URL, got %q", cfg.Loki.URL)
 	}
-	if cfg.Loki.Labels["app"] != "portwatch" {
-		t.Errorf("expected default label app=portwatch, got %v", cfg.Loki.Labels)
+	if cfg.Loki.Labels["job"] != "portwatch" {
+		t.Errorf("expected default job label, got %q", cfg.Loki.Labels["job"])
 	}
 }
 
 func TestLoad_LokiSection(t *testing.T) {
 	path := writeLokiConfig(t, `
+[scanner]
+port_range = "1-1024"
+
 [loki]
 enabled = true
-url = "http://loki:3100"
-tenant_id = "tenant1"
-timeout_seconds = 10
+url = "http://loki.example.com:3100"
+
+[loki.labels]
+job = "portwatch"
+env = "prod"
 `)
-	cfg, err := config.Load(path)
+	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !cfg.Loki.Enabled {
-		t.Error("expected loki to be enabled")
+		t.Error("expected loki enabled")
 	}
-	if cfg.Loki.URL != "http://loki:3100" {
-		t.Errorf("unexpected url: %s", cfg.Loki.URL)
+	if cfg.Loki.URL != "http://loki.example.com:3100" {
+		t.Errorf("unexpected URL: %s", cfg.Loki.URL)
 	}
-	if cfg.Loki.TenantID != "tenant1" {
-		t.Errorf("unexpected tenant_id: %s", cfg.Loki.TenantID)
-	}
-	if cfg.Loki.Timeout != 10 {
-		t.Errorf("expected timeout 10, got %d", cfg.Loki.Timeout)
+	if cfg.Loki.Labels["env"] != "prod" {
+		t.Errorf("expected env=prod label, got %q", cfg.Loki.Labels["env"])
 	}
 }
 
 func TestLoad_LokiMissingURL(t *testing.T) {
 	path := writeLokiConfig(t, `
+[scanner]
+port_range = "1-1024"
+
 [loki]
 enabled = true
+url = ""
 `)
-	_, err := config.Load(path)
+	_, err := Load(path)
 	if err == nil {
-		t.Fatal("expected error for missing loki url")
+		t.Fatal("expected error for missing loki url, got nil")
 	}
 }
