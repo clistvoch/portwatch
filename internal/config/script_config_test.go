@@ -6,23 +6,26 @@ import (
 	"testing"
 )
 
-func writeScriptConfig(t *testing.T, content string) string {
+func writeScriptConfig(t *testing.T, body string) string {
 	t.Helper()
 	dir := t.TempDir()
 	p := filepath.Join(dir, "portwatch.toml")
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatalf("writeScriptConfig: %v", err)
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
 	}
 	return p
 }
 
 func TestLoad_ScriptDefaults(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
 	if cfg.Script.Enabled {
 		t.Error("expected script disabled by default")
 	}
 	if cfg.Script.Timeout != 10 {
-		t.Errorf("expected default timeout 10, got %d", cfg.Script.Timeout)
+		t.Errorf("expected timeout 10, got %d", cfg.Script.Timeout)
 	}
 }
 
@@ -53,9 +56,12 @@ func TestLoad_ScriptMissingPath(t *testing.T) {
 [script]
 enabled = true
 `)
-	_, err := Load(p)
-	if err == nil {
-		t.Fatal("expected error for missing script path")
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if err := validateScript(cfg.Script); err == nil {
+		t.Fatal("expected validation error for missing path")
 	}
 }
 
@@ -66,8 +72,11 @@ enabled = true
 path = "/usr/local/bin/alert.sh"
 timeout_seconds = 0
 `)
-	_, err := Load(p)
-	if err == nil {
-		t.Fatal("expected error for invalid timeout")
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if err := validateScript(cfg.Script); err == nil {
+		t.Fatal("expected validation error for zero timeout")
 	}
 }
