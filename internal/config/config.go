@@ -55,12 +55,29 @@ func Validate(cfg Config) error {
 	if cfg.Interval <= 0 {
 		return fmt.Errorf("interval_seconds must be > 0")
 	}
+	if err := validatePortRange(cfg.PortRange); err != nil {
+		return err
+	}
+	if cfg.Email.Enabled {
+		if cfg.Email.Host == "" {
+			return fmt.Errorf("email.host is required when email is enabled")
+		}
+		if len(cfg.Email.To) == 0 {
+			return fmt.Errorf("email.to must have at least one recipient when email is enabled")
+		}
+	}
+	return nil
+}
+
+// validatePortRange checks that the port range string is well-formed and within
+// the valid port number bounds [1, 65535] with lo <= hi.
+func validatePortRange(portRange string) error {
 	var lo, hi int
-	if _, err := fmt.Sscanf(cfg.PortRange, "%d-%d", &lo, &hi); err != nil {
-		return fmt.Errorf("invalid port_range %q", cfg.PortRange)
+	if _, err := fmt.Sscanf(portRange, "%d-%d", &lo, &hi); err != nil {
+		return fmt.Errorf("invalid port_range %q", portRange)
 	}
 	if lo < 1 || hi > 65535 || lo > hi {
-		return fmt.Errorf("port_range out of bounds: %s", cfg.PortRange)
+		return fmt.Errorf("port_range out of bounds: %s", portRange)
 	}
 	return nil
 }
