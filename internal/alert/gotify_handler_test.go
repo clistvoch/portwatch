@@ -65,3 +65,20 @@ func TestGotifyHandler_ServerError(t *testing.T) {
 		t.Fatal("expected error on server 500")
 	}
 }
+
+func TestGotifyHandler_TokenInHeader(t *testing.T) {
+	var receivedToken string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedToken = r.Header.Get("X-Gotify-Key")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	h := NewGotifyHandler(ts.URL, "secret-token", 5)
+	if err := h.Handle([]monitor.Change{buildGotifyChange(monitor.Opened, 80)}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if receivedToken != "secret-token" {
+		t.Errorf("expected token 'secret-token' in X-Gotify-Key header, got %q", receivedToken)
+	}
+}
