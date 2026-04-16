@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -60,10 +61,12 @@ func (h *ElasticsearchHandler) Handle(changes []monitor.Change) error {
 		if err != nil {
 			return fmt.Errorf("elasticsearch: send: %w", err)
 		}
-		_ = resp.Body.Close()
 		if resp.StatusCode >= 300 {
-			return fmt.Errorf("elasticsearch: unexpected status %d", resp.StatusCode)
+			errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+			_ = resp.Body.Close()
+			return fmt.Errorf("elasticsearch: unexpected status %d: %s", resp.StatusCode, errBody)
 		}
+		_ = resp.Body.Close()
 	}
 	return nil
 }
