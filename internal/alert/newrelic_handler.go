@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -75,7 +76,8 @@ func (h *newRelicHandler) Handle(changes []monitor.Change) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("newrelic: unexpected status %d", resp.StatusCode)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("newrelic: unexpected status %d: %s", resp.StatusCode, bytes.TrimSpace(respBody))
 	}
 	return nil
 }
