@@ -6,12 +6,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
-	"github.com/user/portwatch/internal/monitor"
+	"github.com/yourorg/portwatch/internal/monitor"
 )
 
-// lineHandler sends alerts to LINE Notify.
+// lineHandler sends port-change alerts to LINE Notify.
 type lineHandler struct {
 	token   string
 	apiURL  string
@@ -19,19 +18,13 @@ type lineHandler struct {
 	client  *http.Client
 }
 
-// NewLineHandler creates a new LINE Notify alert handler.
+// NewLineHandler returns a Handler that posts to the LINE Notify API.
 func NewLineHandler(token, apiURL, prefix string) Handler {
-	if apiURL == "" {
-		apiURL = "https://notify-api.line.me/api/notify"
-	}
-	if prefix == "" {
-		prefix = "[portwatch]"
-	}
 	return &lineHandler{
 		token:  token,
 		apiURL: apiURL,
 		prefix: prefix,
-		client: &http.Client{Timeout: 10 * time.Second},
+		client: &http.Client{},
 	}
 }
 
@@ -40,19 +33,14 @@ func (h *lineHandler) Handle(changes []monitor.Change) error {
 		return nil
 	}
 
-	var sb strings.Builder
-	sb.WriteString(h.prefix)
-	sb.WriteString(fmt.Sprintf(" %d port change(s) detected:\n", len(changes)))
-	for _, c := range changes {
-		sb.WriteString("  " + c.String() + "\n")
-	}
+	msg := h.formatMessage(changes)
 
 	form := url.Values{}
-	form.Set("message", sb.String())
+	form.Set("message", msg)
 
 	req, err := http.NewRequest(http.MethodPost, h.apiURL, strings.NewReader(form.Encode()))
 	if err != nil {
-		return fmt.Errorf("line: create request: %w", err)
+		return fmt.Errorf("line: build request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -61,10 +49,24 @@ func (h *lineHandler) Handle(changes []monitor.Change) error {
 	if err != nil {
 		return fmt.Errorf("line: send request: %w", err)
 	}
-	defer func() { _, _ = io.Copy(io.Discard, resp.Body); resp.Body.Close() }()
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("line: unexpected status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func (h *lineHandler) formatMessage(changes []monitor.Change) string {
+	var sb strings.Builder
+	if h.prefix != "" {
+		sb.WriteString(h.prefix)
+		sb.WriteString(" ")
+	}
+	sb.WriteString(fmt.Sprintf("%d port change(s) detected:\n", len(changes)))
+	for _, c := range changes {
+		sb.WriteString(fmt.Sprintf("  %s\n", c.String()))
+	}
+	return sb.String()
 }
